@@ -69,20 +69,48 @@ jobs:
     
     - name: Pre-setup Android SDK for buildozer
       run: |
+        # 设置环境变量
+        export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+        
         # 创建buildozer将使用的SDK目录
-        mkdir -p /home/runner/.buildozer/android/platform/android-sdk
+        mkdir -p /home/runner/.buildozer/android/platform/android-sdk/build-tools
+        mkdir -p /home/runner/.buildozer/android/platform/android-sdk/platforms
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
         
-        # 接受Android SDK许可证
-        yes | sdkmanager --licenses --sdk_root=/home/runner/.buildozer/android/platform/android-sdk || true
+        # 复制预装的build-tools到buildozer目录
+        # 先检查预装的build-tools版本
+        ls -la $ANDROID_SDK_ROOT/build-tools/ || echo "No build-tools in pre-installed SDK"
         
-        # 预先安装必要的SDK组件
-        sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk \
-          "build-tools;31.0.0" "platforms;android-31" "platform-tools" || true
+        # 从预装SDK复制或下载build-tools
+        if [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
+          # 复制最新的build-tools版本
+          LATEST_BT=$(ls $ANDROID_SDK_ROOT/build-tools/ | sort -V | tail -1)
+          echo "Copying build-tools $LATEST_BT"
+          cp -r $ANDROID_SDK_ROOT/build-tools/$LATEST_BT /home/runner/.buildozer/android/platform/android-sdk/build-tools/
+        else
+          # 手动下载build-tools
+          echo "Downloading build-tools 31.0.0"
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/build-tools_r31-linux.zip
+          unzip -q build-tools_r31-linux.zip
+          mv android-11 /home/runner/.buildozer/android/platform/android-sdk/build-tools/31.0.0
+        fi
+        
+        # 复制platforms
+        if [ -d "$ANDROID_SDK_ROOT/platforms" ]; then
+          cp -r $ANDROID_SDK_ROOT/platforms /home/runner/.buildozer/android/platform/android-sdk/ || true
+        fi
         
         # 验证aidl存在
-        ls -la /home/runner/.buildozer/android/platform/android-sdk/build-tools/31.0.0/aidl || echo "aidl not found"
+        ls -la /home/runner/.buildozer/android/platform/android-sdk/build-tools/*/aidl || echo "aidl check failed"
+        
+        # 接受许可证
+        mkdir -p /home/runner/.buildozer/android/platform/android-sdk/licenses
+        echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > /home/runner/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
+        echo -e "\n84831b9409646a90881d7ab4c3d0ff0e1c1a9b56" > /home/runner/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+        echo -e "\nd975f751698a77b662f125460be17e5b7d9d8e75" > /home/runner/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license-2
     
     - name: Build Android APK
       id: build_apk
@@ -139,7 +167,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试17
+        subject: MusicDL编译失败-尝试18
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
