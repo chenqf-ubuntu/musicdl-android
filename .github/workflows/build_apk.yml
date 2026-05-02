@@ -66,6 +66,8 @@ jobs:
         sed -i 's/^android.archs.*=.*/android.archs = arm64-v8a/' buildozer.spec
         sed -i 's/^android.accept_sdk_license.*=.*/android.accept_sdk_license = True/' buildozer.spec
         sed -i 's/^log_level.*=.*/log_level = 2/' buildozer.spec
+        # 设置使用预装的Android SDK
+        echo "android.sdk_path = /usr/local/lib/android/sdk" >> buildozer.spec
     
     - name: Build Android APK
       id: build_apk
@@ -80,7 +82,7 @@ jobs:
         # Accept Android SDK licenses
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
-        # Install required SDK components
+        # Install required SDK components including build-tools with aidl
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platforms;android-31" "platform-tools" || true
         
         # Install NDK 25b manually
@@ -143,7 +145,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试15
+        subject: MusicDL编译失败-尝试16
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
