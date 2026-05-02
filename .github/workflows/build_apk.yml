@@ -35,6 +35,12 @@ jobs:
         pip install buildozer==1.5.0 cython
         pip install kivy
     
+    - name: Accept Android SDK licenses
+      run: |
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        yes | sdkmanager --licenses || true
+    
     - name: Create buildozer spec
       run: |
         echo '[app]' > buildozer.spec
@@ -46,12 +52,15 @@ jobs:
         echo 'requirements = python3,kivy' >> buildozer.spec
         echo 'orientation = portrait' >> buildozer.spec
         echo 'fullscreen = 0' >> buildozer.spec
+        echo 'android.permissions = INTERNET' >> buildozer.spec
+        echo 'android.accept_sdk_license = True' >> buildozer.spec
         echo '[buildozer]' >> buildozer.spec
         echo 'log_level = 2' >> buildozer.spec
     
     - name: Build APK
       run: |
-        buildozer android debug 2>&1 | tee build.log || true
+        export JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+        yes | buildozer android debug 2>&1 | tee build.log || true
         find . -name "*.apk" -type f 2>/dev/null
     
     - name: Upload APK
@@ -70,7 +79,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL APK编译尝试2
+        subject: MusicDL APK编译尝试3
         body: 编译结果请查看 https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
