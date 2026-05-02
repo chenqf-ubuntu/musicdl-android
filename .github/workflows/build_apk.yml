@@ -1,4 +1,4 @@
-name: Build Android APK with Briefcase
+name: Build Android APK
 
 on:
   push:
@@ -14,54 +14,40 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Setup Python 3.10
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
     
-    - name: Setup Java 17
+    - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: '17'
     
     - name: Install Briefcase
-      run: |
-        pip install briefcase
-        pip install kivy
+      run: pip install briefcase kivy
     
-    - name: Create minimal app
+    - name: Create app
       run: |
         mkdir -p src/musicdl
-        cat > src/musicdl/__main__.py << 'ENDPY'
-print("MusicDL - Music Downloader")
-print("正在初始化...")
-ENDPY
+        echo 'print("MusicDL")' > src/musicdl/__main__.py
     
-    - name: Initialize Briefcase
+    - name: Build
       run: |
-        briefcase new --no-input -a "MusicDL" -d "org.test" -p "musicdl" || true
-    
-    - name: Create Android project
-      run: |
-        cd MusicDL
+        briefcase new --no-input -a MusicDL -d org.test -p musicdl || true
+        cd MusicDL || true
         briefcase create android || true
-    
-    - name: Build APK
-      run: |
-        cd MusicDL
         briefcase build android || true
         briefcase package android || true
-        find . -name "*.apk" -type f
+        find . -name "*.apk" || true
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: musicdl-apk
-        path: |
-          MusicDL/android/*.apk
-          MusicDL/dist/*.apk
+        path: MusicDL/android/*.apk
         retention-days: 7
     
     - name: Send email
@@ -72,7 +58,7 @@ ENDPY
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译尝试7-Briefcase
+        subject: MusicDL编译尝试8
         body: 编译结果请查看 https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
