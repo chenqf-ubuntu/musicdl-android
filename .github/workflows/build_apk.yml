@@ -8,70 +8,38 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y autoconf automake libtool pkg-config libncurses5-dev libncursesw5-dev
-    
-    - name: Install buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython
-    
-    - name: Build APK
-      run: |
-        sed -i 's/^requirements =.*/requirements = python3/' buildozer.spec
-        buildozer android debug
+    - name: Build with buildozer-action
+      uses: emo1/buildozer-action@v1
+      with:
+        workdir: .
+        buildozer_version: stable
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
-      if: always()
       with:
         name: musicdl-apk
         path: bin/*.apk
-        retention-days: 7
     
-    - name: Send email on success
-      if: success()
+    - name: Send email
+      if: always()
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.163.com
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL APK 编译成功
+        subject: MusicDL APK编译结果
         body: |
-          MusicDL Android APK 已编译成功！
-          
-          请在 GitHub Actions Artifacts 页面下载：
-          https://github.com/chenqf-ubuntu/musicdl-android/actions
-          
-          祝您使用愉快！
-        to: 13383817575@163.com
-        from: MusicDL Builder
-    
-    - name: Send email on failure
-      if: failure()
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.163.com
-        server_port: 465
-        username: 13383817575@163.com
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL APK 编译失败
-        body: |
-          MusicDL APK 编译失败，请查看日志：
+          编译已完成，请查看结果：
           https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
