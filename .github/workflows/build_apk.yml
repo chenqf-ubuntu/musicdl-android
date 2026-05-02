@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # 增加超时时间
+    timeout-minutes: 120
     
     steps:
     - name: Checkout repository
@@ -19,94 +19,54 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install dependencies
+    - name: Install buildozer
       run: |
         pip install --upgrade pip
         pip install buildozer cython
-        pip install kivy[base]
     
     - name: Build APK
       run: |
-        # 简化requirements，只保留核心依赖
         sed -i 's/^requirements =.*/requirements = python3,kivy,requests/' buildozer.spec
-        buildozer android debug 2>&1 | tee build.log
+        buildozer android debug
     
-    - name: Upload APK artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: musicdl-apk
-        path: |
-          bin/*.apk
-          build.log
+        path: bin/*.apk
         retention-days: 7
     
-    - name: Send success email
+    - name: Send email on success
       if: success()
-      run: |
-        APK_FILE=$(find bin -name "*.apk" -type f | head -1)
-        if [ -n "$APK_FILE" ]; then
-          python3 -c "
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-import os
-
-msg = MIMEMultipart()
-msg['From'] = '13383817575@163.com'
-msg['To'] = '13383817575@163.com'
-msg['Subject'] = 'MusicDL APK 编译成功'
-
-body = '''您好！
-
-MusicDL Android APK 已编译成功！
-
-下载方式：
-1. GitHub Actions Artifacts页面下载
-2. 或直接从邮件附件下载
-
-仓库地址: https://github.com/chenqf-ubuntu/musicdl-android
-
-祝您使用愉快！'''
-msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
-with open('$APK_FILE', 'rb') as f:
-    part = MIMEBase('application', 'octet-stream')
-    part.set_payload(f.read())
-    encoders.encode_base64(part)
-    part.add_header('Content-Disposition', 'attachment')
-    msg.attach(part)
-
-server = smtplib.SMTP_SSL('smtp.163.com', 465)
-server.login('13383817575@163.com', os.environ['EMAIL_PASSWORD'])
-server.send_message(msg)
-server.quit()
-print('邮件发送成功')
-          "
-        fi
-      env:
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.163.com
+        server_port: 465
+        username: 13383817575@163.com
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: MusicDL APK 编译成功
+        body: |
+          MusicDL Android APK 已编译成功！
+          
+          请在 GitHub Actions Artifacts 页面下载：
+          https://github.com/chenqf-ubuntu/musicdl-android/actions
+          
+          祝您使用愉快！
+        to: 13383817575@163.com
+        from: MusicDL Builder
     
-    - name: Send failure email
+    - name: Send email on failure
       if: failure()
-      run: |
-        python3 -c "
-import smtplib
-from email.mime.text import MIMEText
-import os
-
-msg = MIMEText('MusicDL APK编译失败，请查看日志:\nhttps://github.com/chenqf-ubuntu/musicdl-android/actions', 'plain', 'utf-8')
-msg['Subject'] = 'MusicDL APK 编译失败'
-msg['From'] = '13383817575@163.com'
-msg['To'] = '13383817575@163.com'
-
-server = smtplib.SMTP_SSL('smtp.163.com', 465)
-server.login('13383817575@163.com', os.environ['EMAIL_PASSWORD'])
-server.send_message(msg)
-server.quit()
-print('邮件发送成功')
-        "
-      env:
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.163.com
+        server_port: 465
+        username: 13383817575@163.com
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: MusicDL APK 编译失败
+        body: |
+          MusicDL APK 编译失败，请查看日志：
+          https://github.com/chenqf-ubuntu/musicdl-android/actions
+        to: 13383817575@163.com
+        from: MusicDL Builder
