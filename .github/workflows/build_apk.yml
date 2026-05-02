@@ -35,23 +35,10 @@ jobs:
       run: |
         sudo apt-get update -qq
         sudo apt-get install -qq -y --no-install-recommends \
-          build-essential \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          autoconf \
-          automake \
-          cmake \
-          libtool \
-          pkg-config \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libc6-dev \
-          libstdc++6 \
-          libffi-dev \
-          libssl-dev \
-          zlib1g-dev
+          build-essential git zip unzip openjdk-17-jdk \
+          autoconf automake cmake libtool pkg-config \
+          libncurses5-dev libncursesw5-dev \
+          libc6-dev libstdc++6 libffi-dev libssl-dev zlib1g-dev
         sudo apt-get clean
     
     - name: Install Python packages
@@ -60,12 +47,10 @@ jobs:
         pip install --upgrade buildozer cython
         pip install kivy
     
-    - name: Initialize buildozer
-      run: |
-        buildozer init
-    
     - name: Configure buildozer.spec
       run: |
+        rm -f buildozer.spec
+        buildozer init
         sed -i 's/^title.*=.*/title = MusicDL/' buildozer.spec
         sed -i 's/^package.name.*=.*/package.name = musicdl/' buildozer.spec
         sed -i 's/^package.domain.*=.*/package.domain = org.musicdl/' buildozer.spec
@@ -90,13 +75,12 @@ jobs:
         echo "Starting buildozer build..."
         buildozer android debug 2>&1 | tee build_output.log || true
         
-        echo "Build process completed. Checking for APK..."
+        echo "Build completed. Checking for APK..."
         if find bin -name "*.apk" -type f 2>/dev/null | head -1; then
           echo "apk_found=true" >> $GITHUB_OUTPUT
           ls -la bin/*.apk
         else
           echo "apk_found=false" >> $GITHUB_OUTPUT
-          echo "No APK in bin, checking buildozer directories..."
           find .buildozer -name "*.apk" -type f 2>/dev/null || true
         fi
     
@@ -127,8 +111,8 @@ jobs:
         subject: MusicDL APK编译成功！
         body: |
           MusicDL APK已成功编译！
-          下载地址：https://github.com/chenqf-ubuntu/musicdl-android/actions
-          APK适用于ARM64架构（华为Mate X5）。
+          下载：https://github.com/chenqf-ubuntu/musicdl-android/actions
+          适用于ARM64架构（华为Mate X5）。
         to: 13383817575@163.com
         from: MusicDL Builder
     
@@ -140,7 +124,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试10
-        body: 编译失败，查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
+        subject: MusicDL编译失败-尝试11
+        body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
