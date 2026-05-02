@@ -69,19 +69,15 @@ jobs:
     
     - name: Build Android APK
       id: build_apk
-      env:
-        ANDROID_HOME: /usr/local/lib/android/sdk
-        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-        PATH: $PATH:/usr/local/lib/android/sdk/cmdline-tools/latest/bin
       run: |
+        export ANDROID_HOME=/usr/local/lib/android/sdk
+        export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+        
         # Create required directory for licenses
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
         
-        # Add cmdline-tools to PATH
-        export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
-        
-        # Accept Android SDK licenses using full path
+        # Accept Android SDK licenses
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
         # Install required SDK components
@@ -147,7 +143,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试14
+        subject: MusicDL编译失败-尝试15
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
