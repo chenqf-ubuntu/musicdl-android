@@ -19,6 +19,11 @@ jobs:
       with:
         python-version: '3.11'
     
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y autoconf automake libtool pkg-config libncurses5-dev libncursesw5-dev
+    
     - name: Install buildozer
       run: |
         pip install --upgrade pip
@@ -26,7 +31,7 @@ jobs:
     
     - name: Build APK
       run: |
-        sed -i 's/^requirements =.*/requirements = python3,kivy,requests/' buildozer.spec
+        sed -i 's/^requirements =.*/requirements = python3/' buildozer.spec
         buildozer android debug
     
     - name: Upload APK
