@@ -37,6 +37,7 @@ jobs:
         sudo apt-get install -qq -y --no-install-recommends \
           build-essential git zip unzip \
           autoconf automake cmake libtool pkg-config \
+          libltdl-dev \
           libncurses5-dev libncursesw5-dev \
           libc6-dev libstdc++6 libffi-dev libssl-dev zlib1g-dev
         sudo apt-get clean
@@ -70,7 +71,6 @@ jobs:
     - name: Pre-setup Android SDK for buildozer
       run: |
         export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
         
         mkdir -p /home/runner/.buildozer/android/platform/android-sdk
         mkdir -p ~/.android
@@ -78,7 +78,7 @@ jobs:
         
         # 复制cmdline-tools
         mkdir -p /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools
-        cp -r $ANDROID_SDK_ROOT/cmdline-tools/latest /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/ || echo "cmdline-tools copy failed"
+        cp -r $ANDROID_SDK_ROOT/cmdline-tools/latest /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/ || true
         
         # 创建tools符号链接
         mkdir -p /home/runner/.buildozer/android/platform/android-sdk/tools/bin
@@ -93,23 +93,16 @@ jobs:
         
         # 复制platform-tools
         mkdir -p /home/runner/.buildozer/android/platform/android-sdk/platform-tools
-        if [ -d "$ANDROID_SDK_ROOT/platform-tools" ]; then
-          cp -r $ANDROID_SDK_ROOT/platform-tools/* /home/runner/.buildozer/android/platform/android-sdk/platform-tools/ || true
-        fi
+        cp -r $ANDROID_SDK_ROOT/platform-tools/* /home/runner/.buildozer/android/platform/android-sdk/platform-tools/ || true
         
-        # 使用sdkmanager安装android-31 platform
+        # 安装android-31 platform
         yes | /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager \
           --sdk_root=/home/runner/.buildozer/android/platform/android-sdk \
           "platforms;android-31" || true
         
-        # 验证
-        ls -la /home/runner/.buildozer/android/platform/android-sdk/platforms/ || echo "platforms dir not found"
-        ls -la /home/runner/.buildozer/android/platform/android-sdk/build-tools/*/aidl || echo "aidl not found"
-        
         # 许可证
         mkdir -p /home/runner/.buildozer/android/platform/android-sdk/licenses
         echo -e "\n84831b9409646a90881d7ab4c3d0ff0e1c1a9b56" > /home/runner/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-        echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > /home/runner/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
     
     - name: Build Android APK
       id: build_apk
@@ -166,7 +159,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试20
+        subject: MusicDL编译失败-尝试21
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
