@@ -18,7 +18,6 @@ jobs:
       run: |
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
-        sudo rm -rf /usr/local/lib/android/sdk/ndk
         df -h
     
     - name: Setup Python 3.9
@@ -73,28 +72,22 @@ jobs:
       env:
         ANDROID_HOME: /usr/local/lib/android/sdk
         ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        PATH: $PATH:/usr/local/lib/android/sdk/cmdline-tools/latest/bin
       run: |
-        # Pre-accept Android SDK licenses
+        # Create required directory for licenses
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
         
-        # Install required SDK components and accept licenses
-        sdkmanager --licenses << EOF
-        y
-        y
-        y
-        y
-        y
-        y
-        y
-        y
-        y
-        y
-        EOF
+        # Add cmdline-tools to PATH
+        export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
         
-        sdkmanager "build-tools;31.0.0" "platforms;android-31" "platform-tools" || true
+        # Accept Android SDK licenses using full path
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
-        # Install NDK 25b manually (required by buildozer)
+        # Install required SDK components
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platforms;android-31" "platform-tools" || true
+        
+        # Install NDK 25b manually
         cd /tmp
         wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
         unzip -q android-ndk-r25b-linux.zip
@@ -154,7 +147,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试13
+        subject: MusicDL编译失败-尝试14
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
