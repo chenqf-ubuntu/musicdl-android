@@ -4,8 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'
 
 jobs:
   build:
@@ -49,7 +47,6 @@ jobs:
           pkg-config \
           libncurses5-dev \
           libncursesw5-dev \
-          libtinfo5 \
           libc6-dev \
           libstdc++6 \
           libffi-dev \
@@ -84,25 +81,23 @@ jobs:
         sed -i 's/^android.archs.*=.*/android.archs = arm64-v8a/' buildozer.spec
         sed -i 's/^android.accept_sdk_license.*=.*/android.accept_sdk_license = True/' buildozer.spec
         sed -i 's/^log_level.*=.*/log_level = 2/' buildozer.spec
-        cat buildozer.spec
     
     - name: Build Android APK
       id: build_apk
       run: |
         export JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
-        export ANDROID_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
         
         echo "Starting buildozer build..."
-        buildozer android debug 2>&1 | tee build_output.log
+        buildozer android debug 2>&1 | tee build_output.log || true
         
-        echo "Build completed. Checking for APK..."
-        if find bin -name "*.apk" -type f | head -1; then
+        echo "Build process completed. Checking for APK..."
+        if find bin -name "*.apk" -type f 2>/dev/null | head -1; then
           echo "apk_found=true" >> $GITHUB_OUTPUT
           ls -la bin/*.apk
         else
           echo "apk_found=false" >> $GITHUB_OUTPUT
-          echo "No APK found in bin directory"
-          find .buildozer -name "*.apk" -type f 2>/dev/null || echo "No APK in buildozer directory"
+          echo "No APK in bin, checking buildozer directories..."
+          find .buildozer -name "*.apk" -type f 2>/dev/null || true
         fi
     
     - name: Upload APK
@@ -132,11 +127,8 @@ jobs:
         subject: MusicDL APK编译成功！
         body: |
           MusicDL APK已成功编译！
-          
-          请在GitHub Actions Artifacts页面下载：
-          https://github.com/chenqf-ubuntu/musicdl-android/actions
-          
-          APK适用于ARM64架构设备（华为Mate X5）。
+          下载地址：https://github.com/chenqf-ubuntu/musicdl-android/actions
+          APK适用于ARM64架构（华为Mate X5）。
         to: 13383817575@163.com
         from: MusicDL Builder
     
@@ -148,10 +140,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-继续调试
-        body: |
-          编译失败，正在继续调试...
-          
-          查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
+        subject: MusicDL编译失败-尝试10
+        body: 编译失败，查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
