@@ -4,61 +4,154 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Setup Python
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android/sdk/ndk
+        df -h
+    
+    - name: Setup Python 3.9
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.9'
     
-    - name: Setup Java
+    - name: Setup Java 17
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: '17'
     
-    - name: Install Briefcase
-      run: pip install briefcase kivy
-    
-    - name: Create app
+    - name: Install build dependencies
       run: |
-        mkdir -p src/musicdl
-        echo 'print("MusicDL")' > src/musicdl/__main__.py
+        sudo apt-get update -qq
+        sudo apt-get install -qq -y --no-install-recommends \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          autoconf \
+          automake \
+          cmake \
+          libtool \
+          pkg-config \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          libc6-dev \
+          libstdc++6 \
+          libffi-dev \
+          libssl-dev \
+          zlib1g-dev
+        sudo apt-get clean
     
-    - name: Build
+    - name: Install Python packages
       run: |
-        briefcase new --no-input -a MusicDL -d org.test -p musicdl || true
-        cd MusicDL || true
-        briefcase create android || true
-        briefcase build android || true
-        briefcase package android || true
-        find . -name "*.apk" || true
+        python -m pip install --upgrade pip
+        pip install --upgrade buildozer cython
+        pip install kivy
+    
+    - name: Initialize buildozer
+      run: |
+        buildozer init
+    
+    - name: Configure buildozer.spec
+      run: |
+        sed -i 's/^title.*=.*/title = MusicDL/' buildozer.spec
+        sed -i 's/^package.name.*=.*/package.name = musicdl/' buildozer.spec
+        sed -i 's/^package.domain.*=.*/package.domain = org.musicdl/' buildozer.spec
+        sed -i 's/^source.dir.*=.*/source.dir = ./' buildozer.spec
+        sed -i 's/^version.*=.*/version = 1.0/' buildozer.spec
+        sed -i 's/^requirements.*=.*/requirements = python3,kivy/' buildozer.spec
+        sed -i 's/^fullscreen.*=.*/fullscreen = 0/' buildozer.spec
+        sed -i 's/^orientation.*=.*/orientation = portrait/' buildozer.spec
+        sed -i 's/^android.permissions.*=.*/android.permissions = INTERNET/' buildozer.spec
+        sed -i 's/^android.api.*=.*/android.api = 31/' buildozer.spec
+        sed -i 's/^android.minapi.*=.*/android.minapi = 21/' buildozer.spec
+        sed -i 's/^android.ndk.*=.*/android.ndk = 25b/' buildozer.spec
+        sed -i 's/^android.archs.*=.*/android.archs = arm64-v8a/' buildozer.spec
+        sed -i 's/^android.accept_sdk_license.*=.*/android.accept_sdk_license = True/' buildozer.spec
+        sed -i 's/^log_level.*=.*/log_level = 2/' buildozer.spec
+        cat buildozer.spec
+    
+    - name: Build Android APK
+      id: build_apk
+      run: |
+        export JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+        export ANDROID_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+        
+        echo "Starting buildozer build..."
+        buildozer android debug 2>&1 | tee build_output.log
+        
+        echo "Build completed. Checking for APK..."
+        if find bin -name "*.apk" -type f | head -1; then
+          echo "apk_found=true" >> $GITHUB_OUTPUT
+          ls -la bin/*.apk
+        else
+          echo "apk_found=false" >> $GITHUB_OUTPUT
+          echo "No APK found in bin directory"
+          find .buildozer -name "*.apk" -type f 2>/dev/null || echo "No APK in buildozer directory"
+        fi
     
     - name: Upload APK
+      if: steps.build_apk.outputs.apk_found == 'true'
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: musicdl-apk
-        path: MusicDL/android/*.apk
+        name: musicdl-apk-arm64
+        path: bin/*.apk
+        retention-days: 30
+    
+    - name: Upload build log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build_output.log
         retention-days: 7
     
-    - name: Send email
-      if: always()
+    - name: Send success email
+      if: steps.build_apk.outputs.apk_found == 'true'
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.163.com
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译尝试8
-        body: 编译结果请查看 https://github.com/chenqf-ubuntu/musicdl-android/actions
+        subject: MusicDL APK编译成功！
+        body: |
+          MusicDL APK已成功编译！
+          
+          请在GitHub Actions Artifacts页面下载：
+          https://github.com/chenqf-ubuntu/musicdl-android/actions
+          
+          APK适用于ARM64架构设备（华为Mate X5）。
+        to: 13383817575@163.com
+        from: MusicDL Builder
+    
+    - name: Send failure email
+      if: failure() || steps.build_apk.outputs.apk_found != 'true'
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.163.com
+        server_port: 465
+        username: 13383817575@163.com
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: MusicDL编译失败-继续调试
+        body: |
+          编译失败，正在继续调试...
+          
+          查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
