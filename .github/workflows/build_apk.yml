@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK v1.1
 
 on:
   push:
@@ -39,36 +39,16 @@ jobs:
           autoconf automake cmake libtool pkg-config \
           libltdl-dev \
           libncurses5-dev libncursesw5-dev \
-          libc6-dev libstdc++6 libffi-dev libssl-dev zlib1g-dev
+          libc6-dev libstdc++6 libffi-dev libssl-dev zlib1g-dev \
+          libxml2-dev libxslt1-dev
         sudo apt-get clean
     
     - name: Install Python packages
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade buildozer
-        # 使用Cython 3.0.x版本兼容pyjnius
         pip install 'Cython<3.1'
         pip install kivy
-    
-    - name: Configure buildozer.spec
-      run: |
-        rm -f buildozer.spec
-        buildozer init
-        sed -i 's/^title.*=.*/title = MusicDL/' buildozer.spec
-        sed -i 's/^package.name.*=.*/package.name = musicdl/' buildozer.spec
-        sed -i 's/^package.domain.*=.*/package.domain = org.musicdl/' buildozer.spec
-        sed -i 's/^source.dir.*=.*/source.dir = ./' buildozer.spec
-        sed -i 's/^version.*=.*/version = 1.0/' buildozer.spec
-        sed -i 's/^requirements.*=.*/requirements = python3,kivy/' buildozer.spec
-        sed -i 's/^fullscreen.*=.*/fullscreen = 0/' buildozer.spec
-        sed -i 's/^orientation.*=.*/orientation = portrait/' buildozer.spec
-        sed -i 's/^android.permissions.*=.*/android.permissions = INTERNET/' buildozer.spec
-        sed -i 's/^android.api.*=.*/android.api = 31/' buildozer.spec
-        sed -i 's/^android.minapi.*=.*/android.minapi = 21/' buildozer.spec
-        sed -i 's/^android.ndk.*=.*/android.ndk = 25b/' buildozer.spec
-        sed -i 's/^android.archs.*=.*/android.archs = arm64-v8a/' buildozer.spec
-        sed -i 's/^android.accept_sdk_license.*=.*/android.accept_sdk_license = True/' buildozer.spec
-        sed -i 's/^log_level.*=.*/log_level = 2/' buildozer.spec
     
     - name: Pre-setup Android SDK for buildozer
       run: |
@@ -110,6 +90,7 @@ jobs:
       id: build_apk
       run: |
         echo "Starting buildozer build..."
+        # 使用仓库中的buildozer.spec
         buildozer android debug 2>&1 | tee build_output.log || true
         
         echo "Build completed. Checking for APK..."
@@ -125,7 +106,7 @@ jobs:
       if: steps.build_apk.outputs.apk_found == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: musicdl-apk-arm64
+        name: musicdl-apk-arm64-v1.1
         path: bin/*.apk
         retention-days: 30
     
@@ -145,9 +126,16 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL APK编译成功！
+        subject: MusicDL v1.1 APK编译成功
         body: |
-          MusicDL APK已成功编译！
+          MusicDL v1.1 APK已成功编译！
+          
+          更新内容：
+          - 界面改为英文（解决中文乱码）
+          - 添加网络和存储权限
+          - 添加必要依赖库
+          - 支持选择音乐源
+          
           下载：https://github.com/chenqf-ubuntu/musicdl-android/actions
           适用于ARM64架构（华为Mate X5）。
         to: 13383817575@163.com
@@ -161,7 +149,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试22
+        subject: MusicDL v1.1编译失败
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
