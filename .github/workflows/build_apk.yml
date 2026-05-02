@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK with Briefcase
 
 on:
   push:
@@ -7,17 +7,17 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Setup Python 3.8
+    - name: Setup Python 3.10
       uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.10'
     
     - name: Setup Java 17
       uses: actions/setup-java@v4
@@ -25,41 +25,33 @@ jobs:
         distribution: temurin
         java-version: '17'
     
-    - name: Install dependencies
+    - name: Install Briefcase
       run: |
-        sudo apt-get update
-        sudo apt-get install -y autoconf automake libtool pkg-config libncurses5-dev libncursesw5-dev zlib1g-dev libffi-dev libssl-dev git unzip wget cmake
-        pip install buildozer==1.5.1 cython
+        pip install briefcase
         pip install kivy
     
-    - name: Create buildozer spec for Python 3.8
+    - name: Create minimal app
       run: |
-        cat > buildozer.spec << 'EOF'
-[app]
-title = MusicDL
-package.name = musicdl
-package.domain = org.test
-source.dir = .
-source.include_exts = py
-version = 1.0
-requirements = python3==3.8,kivy
-orientation = portrait
-fullscreen = 0
-android.permissions = INTERNET
-android.api = 31
-android.minapi = 21
-android.ndk = 25b
-android.archs = arm64-v8a
-android.accept_sdk_license = True
-
-[buildozer]
-log_level = 2
-EOF
+        mkdir -p src/musicdl
+        cat > src/musicdl/__main__.py << 'ENDPY'
+print("MusicDL - Music Downloader")
+print("正在初始化...")
+ENDPY
+    
+    - name: Initialize Briefcase
+      run: |
+        briefcase new --no-input -a "MusicDL" -d "org.test" -p "musicdl" || true
+    
+    - name: Create Android project
+      run: |
+        cd MusicDL
+        briefcase create android || true
     
     - name: Build APK
       run: |
-        export JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
-        buildozer android debug || true
+        cd MusicDL
+        briefcase build android || true
+        briefcase package android || true
         find . -name "*.apk" -type f
     
     - name: Upload APK
@@ -68,8 +60,8 @@ EOF
       with:
         name: musicdl-apk
         path: |
-          bin/*.apk
-          .buildozer/android/platform/build*/build/*.apk
+          MusicDL/android/*.apk
+          MusicDL/dist/*.apk
         retention-days: 7
     
     - name: Send email
@@ -80,7 +72,7 @@ EOF
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译尝试5-Python3.8
+        subject: MusicDL编译尝试7-Briefcase
         body: 编译结果请查看 https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
