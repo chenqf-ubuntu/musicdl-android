@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  ANDROID_HOME: /opt/hostedtoolcache/Android/sdk
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +20,7 @@ jobs:
     - name: Free disk space
       run: |
         sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android/sdk/ndk
+        sudo rm -rf /opt/ghc
         df -h
     
     - name: Setup Python 3.9
@@ -31,11 +34,19 @@ jobs:
         distribution: temurin
         java-version: '17'
     
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+    
+    - name: Accept Android licenses
+      run: |
+        yes | sdkmanager --licenses
+        sdkmanager "build-tools;33.0.2" "platforms;android-33"
+    
     - name: Install build dependencies
       run: |
         sudo apt-get update -qq
         sudo apt-get install -qq -y --no-install-recommends \
-          build-essential git zip unzip openjdk-17-jdk \
+          build-essential git zip unzip \
           autoconf automake cmake libtool pkg-config \
           libncurses5-dev libncursesw5-dev \
           libc6-dev libstdc++6 libffi-dev libssl-dev zlib1g-dev
@@ -60,7 +71,7 @@ jobs:
         sed -i 's/^fullscreen.*=.*/fullscreen = 0/' buildozer.spec
         sed -i 's/^orientation.*=.*/orientation = portrait/' buildozer.spec
         sed -i 's/^android.permissions.*=.*/android.permissions = INTERNET/' buildozer.spec
-        sed -i 's/^android.api.*=.*/android.api = 31/' buildozer.spec
+        sed -i 's/^android.api.*=.*/android.api = 33/' buildozer.spec
         sed -i 's/^android.minapi.*=.*/android.minapi = 21/' buildozer.spec
         sed -i 's/^android.ndk.*=.*/android.ndk = 25b/' buildozer.spec
         sed -i 's/^android.archs.*=.*/android.archs = arm64-v8a/' buildozer.spec
@@ -70,8 +81,6 @@ jobs:
     - name: Build Android APK
       id: build_apk
       run: |
-        export JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
-        
         echo "Starting buildozer build..."
         buildozer android debug 2>&1 | tee build_output.log || true
         
@@ -124,7 +133,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试11
+        subject: MusicDL编译失败-尝试12
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
