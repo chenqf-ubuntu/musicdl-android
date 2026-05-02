@@ -5,9 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  ANDROID_HOME: /opt/hostedtoolcache/Android/sdk
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,6 +18,7 @@ jobs:
       run: |
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
+        sudo rm -rf /usr/local/lib/android/sdk/ndk
         df -h
     
     - name: Setup Python 3.9
@@ -33,14 +31,6 @@ jobs:
       with:
         distribution: temurin
         java-version: '17'
-    
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-    
-    - name: Accept Android licenses
-      run: |
-        yes | sdkmanager --licenses
-        sdkmanager "build-tools;33.0.2" "platforms;android-33"
     
     - name: Install build dependencies
       run: |
@@ -71,7 +61,7 @@ jobs:
         sed -i 's/^fullscreen.*=.*/fullscreen = 0/' buildozer.spec
         sed -i 's/^orientation.*=.*/orientation = portrait/' buildozer.spec
         sed -i 's/^android.permissions.*=.*/android.permissions = INTERNET/' buildozer.spec
-        sed -i 's/^android.api.*=.*/android.api = 33/' buildozer.spec
+        sed -i 's/^android.api.*=.*/android.api = 31/' buildozer.spec
         sed -i 's/^android.minapi.*=.*/android.minapi = 21/' buildozer.spec
         sed -i 's/^android.ndk.*=.*/android.ndk = 25b/' buildozer.spec
         sed -i 's/^android.archs.*=.*/android.archs = arm64-v8a/' buildozer.spec
@@ -80,8 +70,39 @@ jobs:
     
     - name: Build Android APK
       id: build_apk
+      env:
+        ANDROID_HOME: /usr/local/lib/android/sdk
+        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
       run: |
+        # Pre-accept Android SDK licenses
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        
+        # Install required SDK components and accept licenses
+        sdkmanager --licenses << EOF
+        y
+        y
+        y
+        y
+        y
+        y
+        y
+        y
+        y
+        y
+        EOF
+        
+        sdkmanager "build-tools;31.0.0" "platforms;android-31" "platform-tools" || true
+        
+        # Install NDK 25b manually (required by buildozer)
+        cd /tmp
+        wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
+        unzip -q android-ndk-r25b-linux.zip
+        mkdir -p $ANDROID_HOME/ndk
+        mv android-ndk-r25b $ANDROID_HOME/ndk/25.2.9519653
+        
         echo "Starting buildozer build..."
+        cd $GITHUB_WORKSPACE
         buildozer android debug 2>&1 | tee build_output.log || true
         
         echo "Build completed. Checking for APK..."
@@ -133,7 +154,7 @@ jobs:
         server_port: 465
         username: 13383817575@163.com
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL编译失败-尝试12
+        subject: MusicDL编译失败-尝试13
         body: 查看日志：https://github.com/chenqf-ubuntu/musicdl-android/actions
         to: 13383817575@163.com
         from: MusicDL Builder
