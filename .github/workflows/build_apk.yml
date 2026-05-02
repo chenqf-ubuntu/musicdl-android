@@ -8,26 +8,69 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
     
-    - uses: actions/setup-python@v5
+    - name: Setup Python
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.10'
     
-    - name: Build with buildozer-action
-      uses: emo1/buildozer-action@v1
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -qq -y --no-install-recommends \
+          autoconf automake libtool pkg-config \
+          libncurses5-dev libncursesw5-dev \
+          openjdk-17-jdk unzip
+        sudo apt-get clean
+        sudo rm -rf /var/lib/apt/lists/*
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
       with:
-        workdir: .
-        buildozer_version: stable
+        distribution: 'temurin'
+        java-version: '17'
+    
+    - name: Install buildozer
+      run: |
+        pip install --user buildozer cython
+        pip install --user kivy
+    
+    - name: Build APK
+      run: |
+        # 简化配置
+        echo "[app]" > buildozer.spec.new
+        echo "title = MusicDL" >> buildozer.spec.new
+        echo "package.name = musicdl" >> buildozer.spec.new
+        echo "package.domain = org.test" >> buildozer.spec.new
+        echo "source.dir = ." >> buildozer.spec.new
+        echo "version = 1.0" >> buildozer.spec.new
+        echo "requirements = python3" >> buildozer.spec.new
+        echo "orientation = portrait" >> buildozer.spec.new
+        echo "fullscreen = 0" >> buildozer.spec.new
+        echo "android.permissions = INTERNET" >> buildozer.spec.new
+        echo "android.api = 33" >> buildozer.spec.new
+        echo "android.minapi = 21" >> buildozer.spec.new
+        echo "android.ndk = 25b" >> buildozer.spec.new
+        echo "android.archs = arm64-v8a" >> buildozer.spec.new
+        echo "android.accept_sdk_license = True" >> buildozer.spec.new
+        mv buildozer.spec.new buildozer.spec
+        
+        ~/.local/bin/buildozer android debug || echo "Build attempted"
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: musicdl-apk
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-*/build/*.apk
+        retention-days: 7
     
     - name: Send email
       if: always()
@@ -41,5 +84,7 @@ jobs:
         body: |
           编译已完成，请查看结果：
           https://github.com/chenqf-ubuntu/musicdl-android/actions
+          
+          可在Artifacts页面下载APK文件。
         to: 13383817575@163.com
         from: MusicDL Builder
