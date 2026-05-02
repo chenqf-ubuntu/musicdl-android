@@ -2,12 +2,13 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:  # Allow manual trigger
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120  # 增加超时时间
     
     steps:
     - name: Checkout repository
@@ -18,94 +19,94 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install buildozer
+    - name: Install dependencies
       run: |
+        pip install --upgrade pip
         pip install buildozer cython
         pip install kivy[base]
     
-    - name: Cache Android SDK
-      uses: actions/cache@v4
-      with:
-        path: ~/.buildozer/android/platform/android-sdk
-        key: android-sdk-${{ runner.os }}
-        restore-keys: |
-          android-sdk-
-    
-    - name: Cache Android NDK
-      uses: actions/cache@v4
-      with:
-        path: ~/.buildozer/android/platform/android-ndk
-        key: android-ndk-${{ runner.os }}
-        restore-keys: |
-          android-ndk-
-    
-    - name: Build APK (Debug)
+    - name: Build APK
       run: |
-        buildozer android debug || true
-        # Retry if first attempt fails (common with buildozer)
-        buildozer android debug
+        # 简化requirements，只保留核心依赖
+        sed -i 's/^requirements =.*/requirements = python3,kivy,requests/' buildozer.spec
+        buildozer android debug 2>&1 | tee build.log
     
-    - name: Find APK
-      run: |
-        ls -la bin/
-        APK_FILE=$(find bin -name "*.apk" -type f | head -1)
-        echo "APK_FILE=$APK_FILE" >> $GITHUB_ENV
-        echo "Found APK: $APK_FILE"
-    
-    - name: Upload APK as artifact
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
-      if: success()
+      if: always()
       with:
         name: musicdl-apk
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          build.log
         retention-days: 7
     
-    - name: Send email with APK
+    - name: Send success email
       if: success()
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.163.com
-        server_port: 465
-        username: 13383817575@163.com
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL APK 编译成功
-        body: |
-          您好！
-          
-          MusicDL Android APK 已编译成功。
-          
-          文件信息：
-          - APK文件已上传到GitHub Actions Artifacts
-          - 可在GitHub仓库的Actions页面下载
-          
-          如果您无法下载Artifacts，请手动访问：
-          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          祝您使用愉快！
-        to: 13383817575@163.com
-        from: MusicDL Builder
-        attachments: bin/*.apk
+      run: |
+        APK_FILE=$(find bin -name "*.apk" -type f | head -1)
+        if [ -n "$APK_FILE" ]; then
+          python3 -c "
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+import os
+
+msg = MIMEMultipart()
+msg['From'] = '13383817575@163.com'
+msg['To'] = '13383817575@163.com'
+msg['Subject'] = 'MusicDL APK 编译成功'
+
+body = '''您好！
+
+MusicDL Android APK 已编译成功！
+
+下载方式：
+1. GitHub Actions Artifacts页面下载
+2. 或直接从邮件附件下载
+
+仓库地址: https://github.com/chenqf-ubuntu/musicdl-android
+
+祝您使用愉快！'''
+msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+with open('$APK_FILE', 'rb') as f:
+    part = MIMEBase('application', 'octet-stream')
+    part.set_payload(f.read())
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', 'attachment')
+    msg.attach(part)
+
+server = smtplib.SMTP_SSL('smtp.163.com', 465)
+server.login('13383817575@163.com', os.environ['EMAIL_PASSWORD'])
+server.send_message(msg)
+server.quit()
+print('邮件发送成功')
+          "
+        fi
+      env:
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
     
-    - name: Report failure
+    - name: Send failure email
       if: failure()
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.163.com
-        server_port: 465
-        username: 13383817575@163.com
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: MusicDL APK 编译失败
-        body: |
-          您好！
-          
-          MusicDL Android APK 编译失败。
-          
-          请查看日志：
-          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          可能的原因：
-          1. buildozer配置问题
-          2. Android SDK/NDK下载失败
-          3. Python依赖编译失败
-        to: 13383817575@163.com
-        from: MusicDL Builder
+      run: |
+        python3 -c "
+import smtplib
+from email.mime.text import MIMEText
+import os
+
+msg = MIMEText('MusicDL APK编译失败，请查看日志:\nhttps://github.com/chenqf-ubuntu/musicdl-android/actions', 'plain', 'utf-8')
+msg['Subject'] = 'MusicDL APK 编译失败'
+msg['From'] = '13383817575@163.com'
+msg['To'] = '13383817575@163.com'
+
+server = smtplib.SMTP_SSL('smtp.163.com', 465)
+server.login('13383817575@163.com', os.environ['EMAIL_PASSWORD'])
+server.send_message(msg)
+server.quit()
+print('邮件发送成功')
+        "
+      env:
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
